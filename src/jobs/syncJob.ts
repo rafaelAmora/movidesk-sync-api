@@ -1,4 +1,4 @@
-import PgBoss from "pg-boss";
+import { PgBoss } from "pg-boss";
 import { syncWarranties, syncTicketResponses } from "../controllers/sync-tickets.controller.js";
 
 export let boss: PgBoss;
@@ -12,7 +12,7 @@ export async function startJobs() {
 
   boss = new PgBoss(connectionString);
 
-  boss.on("error", (error) => {
+  boss.on("error", (error: Error) => {
     console.error("Erro no pg-boss:", error);
   });
 
