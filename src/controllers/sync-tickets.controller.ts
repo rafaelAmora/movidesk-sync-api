@@ -26,6 +26,12 @@ const getFieldValueItem = (ticket: MovideskTicket, fieldId: number) =>
   ticket.customFieldValues?.find((f) => f.customFieldId === fieldId)?.items?.[0]
     ?.customFieldItem ?? null;
 
+const getFieldItems = (ticket: MovideskTicket, fieldId: number): string[] =>
+  ticket.customFieldValues
+    ?.find((f) => f.customFieldId === fieldId)
+    ?.items?.map((item) => item.customFieldItem)
+    .filter((value): value is string => Boolean(value?.trim())) ?? [];
+    
 function buildWarrantyFilter(): string {
   const year = new Date().getFullYear();
 
@@ -70,57 +76,60 @@ async function upsertWarrantyChunks(
   for (let i = 0; i < valid.length; i += CHUNK_SIZE) {
     const chunk = valid.slice(i, i + CHUNK_SIZE);
 
-    const results = await Promise.allSettled(
-      chunk.map((ticket) => {
-        const serialNumber = getFieldValue(ticket, 92408)!;
-        const warrantyApprovedAt = getFieldValue(ticket, 107733);
-        const warrantyDeniedAt = getFieldValue(ticket, 243250);
-        const category = normalizeWarrantyCategory(
-          ticket.category ?? null,
-          warrantyApprovedAt,
-          warrantyDeniedAt,
-        );
-        const approvalIssueReason = getFieldValueItem(ticket, 224262);
-        const isRecurrentInAnalysis = getFieldValueItem(ticket, 216435);
-        const defect = getFieldValueItem(ticket, 144016);
-        const model = getFieldValueItem(ticket, 152179); // <-- novo
-
-        return prisma.warrantyTickets.upsert({
-          where: { ticket: ticket.id },
-          update: {
-            serialNumber,
-            category,
-            approvalIssueReason,
-            isRecurrentInAnalysis,
-            defect,
-            model,
-            team: ticket.ownerTeam,
-            warrantyApprovedAt: warrantyApprovedAt
-              ? new Date(warrantyApprovedAt)
-              : null,
-            warrantyDeniedAt: warrantyDeniedAt
-              ? new Date(warrantyDeniedAt)
-              : null,
-          },
-          create: {
-            ticket: ticket.id,
-            serialNumber,
-            approvalIssueReason,
-            isRecurrentInAnalysis,
-            defect,
-            model, 
-            category,
-            team: ticket.ownerTeam,
-            warrantyApprovedAt: warrantyApprovedAt
-              ? new Date(warrantyApprovedAt)
-              : null,
-            warrantyDeniedAt: warrantyDeniedAt
-              ? new Date(warrantyDeniedAt)
-              : null,
-          },
-        });
-      }),
+   const results = await Promise.allSettled(
+  chunk.map((ticket) => {
+    const serialNumber = getFieldValue(ticket, 92408)!;
+    const warrantyApprovedAt = getFieldValue(ticket, 107733);
+    const warrantyDeniedAt = getFieldValue(ticket, 243250);
+    const category = normalizeWarrantyCategory(
+      ticket.category ?? null,
+      warrantyApprovedAt,
+      warrantyDeniedAt,
     );
+    const approvalIssueReason = getFieldValueItem(ticket, 224262);
+    const isRecurrentInAnalysis = getFieldValueItem(ticket, 216435);
+    const defect = getFieldValueItem(ticket, 144016);
+    const model = getFieldValueItem(ticket, 152179);
+    const internalChecklist = getFieldItems(ticket, 245596); // <-- novo
+
+    return prisma.warrantyTickets.upsert({
+      where: { ticket: ticket.id },
+      update: {
+        serialNumber,
+        category,
+        approvalIssueReason,
+        isRecurrentInAnalysis,
+        defect,
+        model,
+        internalChecklist, // <-- novo
+        team: ticket.ownerTeam,
+        warrantyApprovedAt: warrantyApprovedAt
+          ? new Date(warrantyApprovedAt)
+          : null,
+        warrantyDeniedAt: warrantyDeniedAt
+          ? new Date(warrantyDeniedAt)
+          : null,
+      },
+      create: {
+        ticket: ticket.id,
+        serialNumber,
+        approvalIssueReason,
+        isRecurrentInAnalysis,
+        defect,
+        model,
+        internalChecklist, // <-- novo
+        category,
+        team: ticket.ownerTeam,
+        warrantyApprovedAt: warrantyApprovedAt
+          ? new Date(warrantyApprovedAt)
+          : null,
+        warrantyDeniedAt: warrantyDeniedAt
+          ? new Date(warrantyDeniedAt)
+          : null,
+      },
+    });
+  }),
+);
 
     for (const result of results) {
       if (result.status === "fulfilled") saved++;

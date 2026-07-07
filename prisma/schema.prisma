@@ -62,6 +62,7 @@ model WarrantyTickets {
   approvalIssueReason   String?
   defect                String?
   isRecurrentInAnalysis String?
+  internalChecklist     String[]  @default([])
   warrantyApprovedAt    DateTime?
   warrantyDeniedAt      DateTime?
   createdAt             DateTime  @default(now())
