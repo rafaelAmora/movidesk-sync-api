@@ -82,6 +82,8 @@ async function upsertWarrantyChunks(
         );
         const approvalIssueReason = getFieldValueItem(ticket, 224262);
         const isRecurrentInAnalysis = getFieldValueItem(ticket, 216435);
+        const defect = getFieldValueItem(ticket, 144016);
+        const model = getFieldValueItem(ticket, 152179); // <-- novo
 
         return prisma.warrantyTickets.upsert({
           where: { ticket: ticket.id },
@@ -90,6 +92,8 @@ async function upsertWarrantyChunks(
             category,
             approvalIssueReason,
             isRecurrentInAnalysis,
+            defect,
+            model,
             team: ticket.ownerTeam,
             warrantyApprovedAt: warrantyApprovedAt
               ? new Date(warrantyApprovedAt)
@@ -103,6 +107,8 @@ async function upsertWarrantyChunks(
             serialNumber,
             approvalIssueReason,
             isRecurrentInAnalysis,
+            defect,
+            model, 
             category,
             team: ticket.ownerTeam,
             warrantyApprovedAt: warrantyApprovedAt
@@ -196,8 +202,7 @@ function ticketHasOwner(ticket: MovideskTicket): boolean {
   }
 
   if (ticket.ownerHistories && ticket.ownerHistories.length > 0) {
-    const lastHistory =
-      ticket.ownerHistories[ticket.ownerHistories.length - 1];
+    const lastHistory = ticket.ownerHistories[ticket.ownerHistories.length - 1];
     if (
       lastHistory?.owner &&
       typeof lastHistory?.owner === "object" &&
@@ -410,8 +415,20 @@ async function syncTicketResponses(): Promise<{ total: number; stats: any }> {
     filtrados: {
       inversor: { total: 0, salvos: 0 },
       monitoramento: { total: 0, salvos: 0 },
-      email: { total: 0, salvos: 0, falhouCliente: 0, falhouOwner: 0, falhou7Dias: 0 },
-      novo: { total: 0, salvos: 0, falhouCliente: 0, falhouOwner: 0, falhou7Dias: 0 },
+      email: {
+        total: 0,
+        salvos: 0,
+        falhouCliente: 0,
+        falhouOwner: 0,
+        falhou7Dias: 0,
+      },
+      novo: {
+        total: 0,
+        salvos: 0,
+        falhouCliente: 0,
+        falhouOwner: 0,
+        falhou7Dias: 0,
+      },
       garantia: { total: 0 },
       outro: { total: 0 },
     },
@@ -423,7 +440,8 @@ async function syncTicketResponses(): Promise<{ total: number; stats: any }> {
         token: process.env.MOVIDESK_TOKEN,
         $select:
           "id,subject,status,justification,category,createdDate,origin,ownerTeam,owner,actions,serviceFirstLevel,ownerHistories,createdBy",
-        $expand: "actions($expand=createdBy),ownerHistories($expand=owner),owner",
+        $expand:
+          "actions($expand=createdBy),ownerHistories($expand=owner),owner",
         $filter: buildTicketFilter(),
         $orderby: "id asc",
         $top: PAGE_SIZE,
@@ -451,7 +469,8 @@ async function syncTicketResponses(): Promise<{ total: number; stats: any }> {
       const result = shouldIncludeTicket(ticket);
 
       if (result.category === "INVERSOR") stats.filtrados.inversor.total++;
-      else if (result.category === "MONITORAMENTO") stats.filtrados.monitoramento.total++;
+      else if (result.category === "MONITORAMENTO")
+        stats.filtrados.monitoramento.total++;
       else if (result.category === "EMAIL") stats.filtrados.email.total++;
       else if (result.category === "NOVO") stats.filtrados.novo.total++;
       else if (result.category === "GARANTIA") stats.filtrados.garantia.total++;
@@ -473,7 +492,9 @@ async function syncTicketResponses(): Promise<{ total: number; stats: any }> {
       return { ticket, ...result };
     });
 
-    const filteredTickets = results.filter((r) => r.include).map((r) => r.ticket);
+    const filteredTickets = results
+      .filter((r) => r.include)
+      .map((r) => r.ticket);
 
     // Conta salvos por categoria
     for (const ticket of filteredTickets) {
@@ -528,7 +549,7 @@ class SyncTicketsController {
         stats.salvos.novo;
 
       console.log(
-        `[Sync] ticketResponse: ${totalSalvoGeral} salvos | warrantyTickets: ${warranties} salvos (${(Date.now() - startTime) / 1000}s)`
+        `[Sync] ticketResponse: ${totalSalvoGeral} salvos | warrantyTickets: ${warranties} salvos (${(Date.now() - startTime) / 1000}s)`,
       );
 
       return res.json({

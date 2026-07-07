@@ -18,7 +18,7 @@ export async function startJobs() {
   });
 
 
-  await boss.schedule("sync-tickets", "*/60 * * * *", null, {
+  await boss.schedule("sync-tickets", "* * * * *", null, {
     singletonKey: "sync-tickets",
   });
 }
