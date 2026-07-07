@@ -1,9 +1,21 @@
-import { PgBoss } from "pg-boss";
+import PgBoss from "pg-boss";
 import { syncWarranties, syncTicketResponses } from "../controllers/sync-tickets.controller.js";
 
-export const boss = new PgBoss(process.env.DATABASE_URL!);
+export let boss: PgBoss;
 
 export async function startJobs() {
+  const connectionString = process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    throw new Error("DATABASE_URL não está definida no ambiente");
+  }
+
+  boss = new PgBoss(connectionString);
+
+  boss.on("error", (error) => {
+    console.error("Erro no pg-boss:", error);
+  });
+
   await boss.start();
 
   await boss.createQueue("sync-tickets");
@@ -14,11 +26,12 @@ export async function startJobs() {
       syncTicketResponses(),
     ]);
 
-    console.log(`Sync concluído  garantias: ${warranties} | tickets: ${ticketResponses.total}`);
+    console.log(
+      `Sync concluído — garantias: ${warranties} | tickets: ${ticketResponses.total}`
+    );
   });
 
-
-  await boss.schedule("sync-tickets", "* * * * *", null, {
+  await boss.schedule("sync-tickets", "*/60 * * * *", null, {
     singletonKey: "sync-tickets",
   });
 }
